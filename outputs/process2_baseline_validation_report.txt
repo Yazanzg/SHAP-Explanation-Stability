@@ -1,0 +1,40 @@
+input_csv: C:\Users\Yazan\Thesis\outputs\process2_features.csv
+output_csv: C:\Users\Yazan\Thesis\outputs\process2_baseline_results.csv
+rows_total: 400
+train_rows: 320
+dev_rows: 80
+train_binary_counts: {0: 160, 1: 160}
+dev_binary_counts: {0: 40, 1: 40}
+participant_overlap_count: 0
+semantic_coherence_constant_zero: True
+n_feature_cols: 13
+feature_cols: ['word_count', 'sentence_count', 'type_token_ratio', 'filler_count', 'filler_ratio', 'mean_clause_length', 'content_density', 'noun_ratio', 'verb_ratio', 'adjective_ratio', 'adverb_ratio', 'pronoun_ratio', 'determiner_ratio']
+non_numeric_feature_cols: []
+X_train_nan_count: 0
+X_train_inf_count: 0
+X_dev_nan_count: 0
+X_dev_inf_count: 0
+
+model: logistic_regression
+  auroc: 0.6587500000000001
+  accuracy: 0.625
+  f1: 0.5833333333333334
+  precision: 0.65625
+  recall: 0.525
+  confusion_matrix(TN,FP,FN,TP): 29,11,19,21
+
+model: random_forest
+  auroc: 0.6993750000000001
+  accuracy: 0.675
+  f1: 0.675
+  precision: 0.675
+  recall: 0.675
+  confusion_matrix(TN,FP,FN,TP): 27,13,13,27
+
+model: svm_rbf
+  auroc: 0.7453125
+  accuracy: 0.6625
+  f1: 0.64
+  precision: 0.6857142857142857
+  recall: 0.6
+  confusion_matrix(TN,FP,FN,TP): 29,11,16,24

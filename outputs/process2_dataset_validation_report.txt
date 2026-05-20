@@ -1,0 +1,15 @@
+rows: 400
+transcripts_local_existing: 400 / 400
+audio_local_existing: 400 / 400
+diagnosis_counts:
+  HC: 200
+  MCI: 150
+  Dementia: 50
+binary_counts:
+  0: 200
+  1: 200
+split_counts:
+  train: 320
+  dev: 80
+missing_transcripts_count: 0
+missing_audio_count (audio not present in snapshot): 0

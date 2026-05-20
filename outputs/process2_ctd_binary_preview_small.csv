@@ -1,0 +1,11 @@
+participant_id,audio_path,transcript_path,diagnosis,binary_label,split
+Process-rec-001,C:\Users\Yazan\Thesis\data_old\Archive\Process-rec-001\Process-rec-001__CTD.wav,C:\Users\Yazan\Thesis\data_old\Archive\Process-rec-001\Process-rec-001__CTD.txt,MCI,1,train
+Process-rec-002,C:\Users\Yazan\Thesis\data_old\Archive\Process-rec-002\Process-rec-002__CTD.wav,C:\Users\Yazan\Thesis\data_old\Archive\Process-rec-002\Process-rec-002__CTD.txt,MCI,1,dev
+Process-rec-003,C:\Users\Yazan\Thesis\data_old\Archive\Process-rec-003\Process-rec-003__CTD.wav,C:\Users\Yazan\Thesis\data_old\Archive\Process-rec-003\Process-rec-003__CTD.txt,MCI,1,train
+Process-rec-004,C:\Users\Yazan\Thesis\data_old\Archive\Process-rec-004\Process-rec-004__CTD.wav,C:\Users\Yazan\Thesis\data_old\Archive\Process-rec-004\Process-rec-004__CTD.txt,MCI,1,dev
+Process-rec-005,C:\Users\Yazan\Thesis\data_old\Archive\Process-rec-005\Process-rec-005__CTD.wav,C:\Users\Yazan\Thesis\data_old\Archive\Process-rec-005\Process-rec-005__CTD.txt,MCI,1,train
+Process-rec-006,C:\Users\Yazan\Thesis\data_old\Archive\Process-rec-006\Process-rec-006__CTD.wav,C:\Users\Yazan\Thesis\data_old\Archive\Process-rec-006\Process-rec-006__CTD.txt,Dementia,1,train
+Process-rec-007,C:\Users\Yazan\Thesis\data_old\Archive\Process-rec-007\Process-rec-007__CTD.wav,C:\Users\Yazan\Thesis\data_old\Archive\Process-rec-007\Process-rec-007__CTD.txt,HC,0,dev
+Process-rec-008,C:\Users\Yazan\Thesis\data_old\Archive\Process-rec-008\Process-rec-008__CTD.wav,C:\Users\Yazan\Thesis\data_old\Archive\Process-rec-008\Process-rec-008__CTD.txt,MCI,1,dev
+Process-rec-009,C:\Users\Yazan\Thesis\data_old\Archive\Process-rec-009\Process-rec-009__CTD.wav,C:\Users\Yazan\Thesis\data_old\Archive\Process-rec-009\Process-rec-009__CTD.txt,HC,0,train
+Process-rec-010,C:\Users\Yazan\Thesis\data_old\Archive\Process-rec-010\Process-rec-010__CTD.wav,C:\Users\Yazan\Thesis\data_old\Archive\Process-rec-010\Process-rec-010__CTD.txt,HC,0,train

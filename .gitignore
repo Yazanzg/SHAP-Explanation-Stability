@@ -1,0 +1,40 @@
+# Virtual environments
+.venv/
+.venv311/
+venv/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Dataset and local downloads (controlled access; not redistributed)
+PROCESS-2/
+process2_hf_downloads/
+data_old/
+Data/
+Archive/
+
+# Legacy development artifacts
+outputs/features.csv
+outputs/baseline_results.csv
+outputs/optimized_results.csv
+outputs/shuffled_label_results.csv
+outputs/shap_values_*.csv
+outputs/stability_results.csv
+outputs/last_run.log
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Logs and scratch
+*.log
+extract_output.txt

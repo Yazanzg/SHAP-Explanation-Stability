@@ -1,0 +1,18 @@
+master_csv: C:\Users\Yazan\Thesis\outputs\process2_ctd_binary_master.csv
+master_exists: True
+rows: 400 (expected 400) -> OK
+unique_participant_id: 400 (expected 400) -> OK
+missing_required_columns: []
+transcripts_local_existing: 400 / 400
+nonempty_transcripts: 400 / 400
+diagnosis_counts: {'HC': 200, 'MCI': 150, 'Dementia': 50}
+binary_counts: {0: 200, 1: 200}
+split_counts: {'train': 320, 'dev': 80}
+
+first_3_rows_preview:
+ - participant_id=PROCESS-2_rec__001 | split=train | diagnosis=HC | binary_label=0 | len=1233 | head200= I don't know yeath OK. It appears to be a kitchen full of accidents. The sink is overflowing and yet the lady's not noticing whilst she's got her feet in the water. The children are on a stall which 
+ - participant_id=PROCESS-2_rec__002 | split=train | diagnosis=HC | binary_label=0 | len=341 | head200=cosy kitchen, typical kitchen for a mother two children. Children dangerously standing on the stool or one of them trying to get to a cookie jar. (tuts) Mothers allowing the water to overflow whilst s
+ - participant_id=PROCESS-2_rec__003 | split=train | diagnosis=MCI | binary_label=1 | len=1861 | head200=
+Pat: I think we did this the last time; it’s the same picture, I think.
+Um (tuts) there’s chaos happening in a, a kitchen. A mother is um drying
+a dish but her sink is overflowing with water; it’s go

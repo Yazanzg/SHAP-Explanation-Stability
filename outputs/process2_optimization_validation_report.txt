@@ -1,0 +1,36 @@
+input_csv: C:\Users\Yazan\Thesis\outputs\process2_features.csv
+output_csv: C:\Users\Yazan\Thesis\outputs\process2_optimized_results.csv
+baseline_csv_exists: True
+rows_total: 400
+train_rows: 320
+dev_rows: 80
+participant_overlap_count: 0
+missing_feature_cols: []
+semantic_coherence_in_feature_list: False
+feature_cols_used: ['word_count', 'sentence_count', 'type_token_ratio', 'filler_count', 'filler_ratio', 'mean_clause_length', 'content_density', 'noun_ratio', 'verb_ratio', 'adjective_ratio', 'adverb_ratio', 'pronoun_ratio', 'determiner_ratio']
+X_train_nan_count: 0
+X_train_inf_count: 0
+X_dev_nan_count: 0
+X_dev_inf_count: 0
+train_binary_counts: {0: 160, 1: 160}
+dev_binary_counts: {0: 40, 1: 40}
+
+optimized_models (train-only selection; dev evaluated once):
+- model: logistic_regression
+  best_params: {'clf__C': 0.5}
+  dev_metrics: {'auroc': 0.6625, 'accuracy': 0.6375, 'f1': 0.6027397260273972, 'precision': 0.6666666666666666, 'recall': 0.55}
+  confusion(TN,FP,FN,TP): 29,11,18,22
+  baseline(auroc/acc/f1): 0.6587500000000001/0.625/0.5833333333333334
+  delta(auroc/acc/f1): 0.00375/0.0125/0.0194064
+- model: random_forest
+  best_params: {'clf__max_depth': 4, 'clf__min_samples_leaf': 4, 'clf__min_samples_split': 2}
+  dev_metrics: {'auroc': 0.7200000000000001, 'accuracy': 0.6875, 'f1': 0.6666666666666666, 'precision': 0.7142857142857143, 'recall': 0.625}
+  confusion(TN,FP,FN,TP): 30,10,15,25
+  baseline(auroc/acc/f1): 0.6993750000000001/0.675/0.675
+  delta(auroc/acc/f1): 0.020625/0.0125/-0.00833333
+- model: svm_rbf
+  best_params: {'clf__C': 5.0, 'clf__gamma': 0.01}
+  dev_metrics: {'auroc': 0.7390625, 'accuracy': 0.6625, 'f1': 0.6086956521739131, 'precision': 0.7241379310344828, 'recall': 0.525}
+  confusion(TN,FP,FN,TP): 32,8,19,21
+  baseline(auroc/acc/f1): 0.7453125/0.6625/0.64
+  delta(auroc/acc/f1): -0.00625/0/-0.0313043
