@@ -60,4 +60,7 @@ outputs/figures/tradeoff_auroc_stability.png
 .DS_Store
 Thumbs.db
 
+# Validation logs and text summaries (regenerated locally by scripts)
+outputs/*.txt
+
 # Optional: keep only committed thesis outputs; ignore re-generated duplicates if desired locally

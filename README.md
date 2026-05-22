@@ -81,9 +81,9 @@ python scripts/plot_process2_stability_comparison.py
 | `outputs/shap/process2_shap_values_{baseline\|optimized}_*.csv` | SHAP on **dev** (80 rows each) |
 | `outputs/direct_shap_stability.csv` | Direct baseline vs optimized stability |
 | `outputs/bootstrap_stability.csv` | Bootstrap stability summary |
-| `outputs/process2_*_validation_report.txt` | Stage validation logs |
-| `outputs/process2_methods_technical_summary.txt` | Methods reproducibility summary |
 | `outputs/figures/process2_stability_direct_vs_bootstrap_adjusted.png` | Results figure |
+
+Validation `.txt` reports are written locally when you run staged scripts but are not stored in this repository.
 
 ## Project layout
 
