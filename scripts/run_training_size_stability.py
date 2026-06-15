@@ -43,7 +43,14 @@ from src.modeling import build_estimator, evaluate_on_split
 
 
 def _balanced_subset(pool: pd.DataFrame, size: int, seed: int) -> pd.DataFrame:
-    """Draw size/2 HC (label 0) + size/2 CI (label 1) without replacement."""
+    """Draw size/2 HC (label 0) + size/2 CI (label 1) without replacement.
+
+    The concatenated subset is then placed in a deterministic order (by
+    participant_id when available, otherwise the original master-table order).
+    This guarantees attribution differences between runs reflect *which*
+    participants were sampled, not incidental row order -- which matters because
+    some estimators (e.g. Random Forest bootstrap) are row-order dependent.
+    """
     n = size // 2
     hc = pool[pool[COL_LABEL] == 0]
     ci = pool[pool[COL_LABEL] == 1]
@@ -51,7 +58,12 @@ def _balanced_subset(pool: pd.DataFrame, size: int, seed: int) -> pd.DataFrame:
         raise ValueError(f"size={size} needs {n}/class; pool has {len(hc)} HC / {len(ci)} CI")
     sub_hc = hc.sample(n=n, random_state=seed, replace=False)
     sub_ci = ci.sample(n=n, random_state=seed, replace=False)
-    return pd.concat([sub_hc, sub_ci], ignore_index=True)
+    sub = pd.concat([sub_hc, sub_ci])
+    if COL_PARTICIPANT_ID in sub.columns:
+        sub = sub.sort_values(COL_PARTICIPANT_ID, kind="mergesort")
+    else:
+        sub = sub.sort_index(kind="mergesort")
+    return sub.reset_index(drop=True)
 
 
 def _importance_vector(shap_long: pd.DataFrame) -> dict[str, float]:
@@ -94,7 +106,12 @@ def main() -> None:
     df = pd.read_csv(config.FEATURES_CSV)
     df[COL_SPLIT] = df[COL_SPLIT].astype(str).str.strip().str.lower()
     pool = df[df[COL_SPLIT] == TRAIN_SPLIT_VALUE].reset_index(drop=True)
-    dev = df[df[COL_SPLIT] == TEST_SPLIT_VALUE].reset_index(drop=True)
+    # Fixed dev/test set in deterministic order (by participant_id when available)
+    # so the held-out evaluation and the SHAP background are stable across runs.
+    dev = df[df[COL_SPLIT] == TEST_SPLIT_VALUE]
+    if COL_PARTICIPANT_ID in dev.columns:
+        dev = dev.sort_values(COL_PARTICIPANT_ID, kind="mergesort")
+    dev = dev.reset_index(drop=True)
     dev[COL_PARTICIPANT_ID] = dev[COL_PARTICIPANT_ID].astype(str)
 
     print(f"[run:{tag}] models={models} sizes={sizes} iters={iters}")
