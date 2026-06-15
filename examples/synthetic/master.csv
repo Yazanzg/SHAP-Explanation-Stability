@@ -1,0 +1,11 @@
+participant_id,diagnosis,binary_label,split,transcript_path
+SYN_rec__001,HC,0,train,examples/synthetic/transcripts/syn01.txt
+SYN_rec__002,HC,0,train,examples/synthetic/transcripts/syn02.txt
+SYN_rec__003,HC,0,train,examples/synthetic/transcripts/syn03.txt
+SYN_rec__004,HC,0,train,examples/synthetic/transcripts/syn04.txt
+SYN_rec__005,MCI,1,train,examples/synthetic/transcripts/syn05.txt
+SYN_rec__006,MCI,1,train,examples/synthetic/transcripts/syn06.txt
+SYN_rec__007,Dementia,1,train,examples/synthetic/transcripts/syn07.txt
+SYN_rec__008,Dementia,1,train,examples/synthetic/transcripts/syn08.txt
+SYN_rec__009,HC,0,dev,examples/synthetic/transcripts/syn09.txt
+SYN_rec__010,MCI,1,dev,examples/synthetic/transcripts/syn10.txt

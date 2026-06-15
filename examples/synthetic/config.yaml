@@ -1,0 +1,100 @@
+# =============================================================================
+# Synthetic example configuration (10 fake participants, no real data).
+# Used by scripts/smoke_test.py to exercise the full pipeline end-to-end in
+# under two minutes. Set THESIS_CONFIG=examples/synthetic/config.yaml to use it.
+# Mirrors the structure of the root config.yaml exactly.
+# =============================================================================
+
+paths:
+  data_dir: "examples/synthetic"
+  master_csv: "examples/synthetic/master.csv"
+  features_csv: "examples/synthetic/outputs/features.csv"
+  outputs_dir: "examples/synthetic/outputs"
+  figures_dir: "examples/synthetic/outputs/figures"
+  audit_dir: "examples/synthetic/outputs/audit"
+  importance_vectors_dir: "examples/synthetic/outputs/importance_vectors"
+
+dataset:
+  name: "SYNTHETIC"
+  task: "smoke-test cognitive-impairment classification (HC vs CI)"
+  columns:
+    participant_id: "participant_id"
+    transcript_path: "transcript_path"
+    label: "binary_label"
+    split: "split"
+  diagnosis_column: "diagnosis"
+  label_mapping:
+    HC: 0
+    MCI: 1
+    Dementia: 1
+  positive_class_name: "CI"
+  negative_class_name: "HC"
+  train_split_value: "train"
+  test_split_value: "dev"
+  expected_train_pool: {HC: 4, CI: 4}
+  expected_test: {HC: 1, CI: 1}
+
+features:
+  - word_count
+  - sentence_count
+  - type_token_ratio
+  - filler_count
+  - filler_ratio
+  - mean_clause_length
+  - content_density
+  - noun_ratio
+  - verb_ratio
+  - adjective_ratio
+  - adverb_ratio
+  - pronoun_ratio
+  - determiner_ratio
+
+models:
+  logistic_regression:
+    estimator: "LogisticRegression"
+    shap_explainer: "LinearSHAP"
+    scale_features: true
+    hyperparameters:
+      max_iter: 100
+      solver: "lbfgs"
+      C: 1.0
+  random_forest:
+    estimator: "RandomForestClassifier"
+    shap_explainer: "TreeSHAP"
+    scale_features: false
+    hyperparameters:
+      n_estimators: 50
+      n_jobs: -1
+  svm_rbf:
+    estimator: "SVC"
+    shap_explainer: "KernelSHAP"
+    scale_features: true
+    hyperparameters:
+      kernel: "rbf"
+      probability: true
+      C: 1.0
+      gamma: "scale"
+
+experiment:
+  training_size_grid: [4, 6, 8]
+  iterations_per_size: 2
+  smoke:
+    training_size_grid: [4, 6, 8]
+    iterations_per_size: 2
+    models: ["logistic_regression"]
+
+metrics:
+  primary: "pearson"
+  jaccard_ks: [3, 5, 10]
+  percentile_interval: [2.5, 97.5]
+
+shap:
+  background_size: 4
+  kernel_nsamples: 20
+
+reproducibility:
+  global_seed: 42
+  size_index_offset: 1000
+
+nlp:
+  spacy_model: "en_core_web_sm"
