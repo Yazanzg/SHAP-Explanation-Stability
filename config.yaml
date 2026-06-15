@@ -84,17 +84,17 @@ features:
   - determiner_ratio
 
 # -----------------------------------------------------------------------------
-# Model families with FIXED, PRE-SPECIFIED hyperparameters. No setting is
-# selected through GridSearchCV, optimisation, or performance-based tuning; all
-# values are fixed before the resampling experiment. Most settings are the
-# scikit-learn library defaults:
+# Models used fixed settings following scikit-learn defaults where possible; no
+# setting was selected through GridSearchCV, optimization, or performance-based
+# search. This is not hyperparameter tuning. Per-model notes:
 #   - logistic_regression: scikit-learn defaults (lbfgs, max_iter=100, C=1.0).
 #     A convergence test confirmed the solver converges in 15-17 iterations on
 #     both the smallest (80) and largest (320) balanced subsets, so the default
 #     max_iter=100 is sufficient and no convergence safeguard is needed.
-#   - svm_rbf: scikit-learn defaults (rbf, C=1.0, gamma="scale"); probability=true
-#     is required so KernelSHAP can read predict_proba, not a tuned choice.
 #   - random_forest: scikit-learn defaults (n_estimators=100).
+#   - svm_rbf: scikit-learn defaults (rbf, C=1.0, gamma="scale"). probability=true
+#     is an OPERATIONAL REQUIREMENT for SHAP probability explanations (KernelSHAP
+#     reads predict_proba); it is not a performance setting.
 # `shap_explainer` records which SHAP family explains each model.
 # -----------------------------------------------------------------------------
 models:
@@ -119,7 +119,7 @@ models:
     scale_features: true
     hyperparameters:
       kernel: "rbf"
-      probability: true
+      probability: true            # operational requirement for SHAP probability explanations (not a performance setting)
       C: 1.0
       gamma: "scale"
 

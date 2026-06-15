@@ -94,19 +94,21 @@ python scripts/audit_features.py
 (`semantic_coherence` was constant 0.0 in the thesis environment and is excluded;
 see `outputs/audit/feature_audit.md`.)
 
-## Model settings (fixed, pre-specified — not tuned)
+## Model settings
+
+Models used fixed settings following scikit-learn defaults where possible; no
+setting was selected through GridSearchCV, optimization, or performance-based
+search. This is not hyperparameter tuning.
 
 - **Logistic Regression** — scikit-learn defaults (`lbfgs`, `max_iter=100`,
   `C=1.0`); convergence verified (15-17 iterations on the smallest/largest
   subsets). Explained with LinearSHAP.
-- **Random Forest** — `n_estimators=300` (one fixed non-default value, chosen a
-  priori for more stable TreeSHAP; not tuned). Explained with TreeSHAP.
-- **RBF SVM** — scikit-learn defaults (`C=1.0`, `gamma="scale"`); `probability=True`
-  for KernelSHAP. Explained with KernelSHAP (background = 24 train rows,
-  `nsamples=80`).
-
-No hyperparameter is selected through GridSearchCV, optimisation, or
-performance-based tuning.
+- **Random Forest** — scikit-learn defaults (`n_estimators=100`). Explained with
+  TreeSHAP.
+- **RBF SVM** — scikit-learn defaults (`C=1.0`, `gamma="scale"`). `probability=True`
+  is an operational requirement for SHAP probability explanations (KernelSHAP
+  reads `predict_proba`), not a performance setting. Explained with KernelSHAP
+  (background = 24 rows, `nsamples=80`).
 
 ## Disclaimer
 
