@@ -163,7 +163,7 @@ def main() -> None:
         created += _save(fig, f"fig4_feature_importance_trajectory_{model}")
 
     # --- Captions ---
-    band_txt = (f"Shaded bands / intervals are {int(HI - LO)}% percentile intervals "
+    band_txt = (f"Vertical error bars show {int(HI - LO)}% percentile intervals "
                 f"({LO:g}th-{HI:g}th percentile) computed across repeats.")
     boundary_txt = (f"Main figures use N=80-280; N={BOUNDARY_SIZE} is excluded from all main "
                     f"figures because it is the full-pool boundary: at the full training pool "
