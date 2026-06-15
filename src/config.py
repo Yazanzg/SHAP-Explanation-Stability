@@ -119,6 +119,14 @@ SHAP_BACKGROUND_SIZE: int = int(_shap["background_size"])
 KERNEL_SHAP_NSAMPLES: int = int(_shap["kernel_nsamples"])
 
 # -----------------------------------------------------------------------------
+# Plotting defaults (TASK 8): main figure uses the random-subset regime; the
+# full-pool boundary size is reported in the appendix/table only.
+# -----------------------------------------------------------------------------
+_plotting = CONFIG.get("plotting", {})
+MAIN_FIGURE_SIZES: list[int] = list(_plotting.get("main_figure_sizes", []))
+BOUNDARY_SIZE: int = int(_plotting.get("boundary_size", 0)) or None  # type: ignore[assignment]
+
+# -----------------------------------------------------------------------------
 # Reproducibility / seeding scheme
 # -----------------------------------------------------------------------------
 _repro = CONFIG["reproducibility"]

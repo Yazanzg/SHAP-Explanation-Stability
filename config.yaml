@@ -157,6 +157,19 @@ shap:
   kernel_nsamples: 80       # KernelSHAP nsamples
 
 # -----------------------------------------------------------------------------
+# Plotting defaults (TASK 8).
+# The main learning-curve figure uses N = 80..280, the genuinely random-subset
+# regime. N = 320 is the FULL-POOL BOUNDARY: at that size each balanced subset is
+# the entire 160/160 training pool, so it is a degenerate cell (no random-subset
+# variation) rather than a stability estimate -- LR collapses to Pearson 1.0 and
+# RF only varies through bootstrap row-order. It is therefore reported in the
+# appendix/table as the boundary point, not plotted on the main trend figure.
+# -----------------------------------------------------------------------------
+plotting:
+  main_figure_sizes: [80, 120, 160, 200, 240, 280]
+  boundary_size: 320
+
+# -----------------------------------------------------------------------------
 # Reproducibility / seeding scheme.
 #   global_seed                              -> base seed for all randomness
 #   per-iteration seed = global_seed
