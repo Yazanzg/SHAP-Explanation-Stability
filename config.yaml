@@ -94,9 +94,7 @@ features:
 #     max_iter=100 is sufficient and no convergence safeguard is needed.
 #   - svm_rbf: scikit-learn defaults (rbf, C=1.0, gamma="scale"); probability=true
 #     is required so KernelSHAP can read predict_proba, not a tuned choice.
-#   - random_forest: n_estimators=300 is the ONE non-default value, fixed a priori
-#     for more stable TreeSHAP estimates (more trees -> lower Monte-Carlo noise);
-#     it was not selected on predictive performance.
+#   - random_forest: scikit-learn defaults (n_estimators=100).
 # `shap_explainer` records which SHAP family explains each model.
 # -----------------------------------------------------------------------------
 models:
@@ -113,7 +111,7 @@ models:
     shap_explainer: "TreeSHAP"
     scale_features: false           # trees are scale-invariant
     hyperparameters:
-      n_estimators: 300             # fixed pre-specified (non-default) for SHAP stability
+      n_estimators: 100             # scikit-learn default tree count
       n_jobs: -1
   svm_rbf:
     estimator: "SVC"
