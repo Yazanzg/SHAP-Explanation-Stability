@@ -1,120 +1,158 @@
-"""Central configuration for the thesis reproducibility pipeline."""
+"""Central configuration loader for the thesis reproducibility pipeline.
+
+All paths and parameters live in ``config.yaml`` at the repository root. This
+module loads that file once and exposes its values as plain module-level
+constants and a few small helper functions. There is intentionally no
+metaprogramming here: every constant below maps directly to a key in
+``config.yaml`` and can be explained line by line.
+
+To run against an alternate configuration (e.g. the 10-row synthetic example
+used by the smoke test), set the environment variable ``THESIS_CONFIG`` to the
+path of another YAML file before importing the pipeline.
+"""
 
 from __future__ import annotations
 
 import os
 from pathlib import Path
+from typing import Any
 
-# Project root: parent of `src/`
+import yaml
+
+# -----------------------------------------------------------------------------
+# Locate and load config.yaml
+# -----------------------------------------------------------------------------
 PROJECT_ROOT: Path = Path(__file__).resolve().parent.parent
 
-# -----------------------------------------------------------------------------
-# Dataset mode
-# -----------------------------------------------------------------------------
-# PROCESS2 — final thesis cohort (PROCESS-2 / CognoSpeak layout)
-# LEGACY   — previous Data/ or data/ development layout (Archive, Data_AUG, etc.)
-DATASET_NAME: str = os.environ.get("THESIS_DATASET", "PROCESS2").strip().upper()
-
-# Optional class_weight='balanced' model variants (robustness only; off by default)
-INCLUDE_BALANCED_VARIANTS: bool = (
-    os.environ.get("THESIS_INCLUDE_BALANCED", "0").strip() == "1"
+_CONFIG_OVERRIDE = os.environ.get("THESIS_CONFIG", "").strip()
+CONFIG_PATH: Path = (
+    Path(_CONFIG_OVERRIDE).expanduser().resolve()
+    if _CONFIG_OVERRIDE
+    else (PROJECT_ROOT / "config.yaml").resolve()
 )
 
-_DATA_OVERRIDE = os.environ.get("THESIS_DATA_DIR", "").strip()
-
-# PROCESS-2 master table (authoritative CTD-only index)
-PROCESS2_MASTER_CSV: Path = (
-    PROJECT_ROOT
-    / os.environ.get(
-        "THESIS_PROCESS2_MASTER_CSV", "outputs/process2_ctd_binary_master.csv"
-    )
-).resolve()
-
-
-def resolve_data_dir() -> Path:
-    """Return the dataset root directory."""
-    if _DATA_OVERRIDE:
-        p = Path(_DATA_OVERRIDE).expanduser().resolve()
-        if not p.is_dir():
-            raise FileNotFoundError(
-                f"THESIS_DATA_DIR is set but not a directory: {p}"
-            )
-        return p
-    if DATASET_NAME == "PROCESS2":
-        candidate = PROJECT_ROOT / "PROCESS-2"
-        if candidate.is_dir():
-            return candidate.resolve()
-        raise FileNotFoundError(
-            f"PROCESS-2 folder not found at {candidate}. "
-            "Download the dataset from Hugging Face / CognoSpeak, extract it there, "
-            "or set THESIS_DATA_DIR to the dataset root."
-        )
-    for name in ("data", "Data"):
-        candidate = PROJECT_ROOT / name
-        if candidate.is_dir():
-            return candidate.resolve()
+if not CONFIG_PATH.is_file():
     raise FileNotFoundError(
-        f"No legacy dataset folder found under {PROJECT_ROOT}. "
-        "Create data/ or Data/, set THESIS_DATASET=LEGACY, or use PROCESS-2."
+        f"Configuration file not found: {CONFIG_PATH}. "
+        "Expected config.yaml at the repository root, or set THESIS_CONFIG."
     )
+
+with CONFIG_PATH.open("r", encoding="utf-8") as fh:
+    CONFIG: dict[str, Any] = yaml.safe_load(fh)
+
+
+def _resolve(path_str: str) -> Path:
+    """Resolve a config path relative to the repository root (absolute kept as-is)."""
+    p = Path(path_str).expanduser()
+    return p.resolve() if p.is_absolute() else (PROJECT_ROOT / p).resolve()
+
+
+# -----------------------------------------------------------------------------
+# Paths
+# -----------------------------------------------------------------------------
+_paths = CONFIG["paths"]
+DATA_DIR: Path = _resolve(_paths["data_dir"])
+MASTER_CSV: Path = _resolve(_paths["master_csv"])
+FEATURES_CSV: Path = _resolve(_paths["features_csv"])
+OUTPUT_DIR: Path = _resolve(_paths["outputs_dir"])
+FIGURES_DIR: Path = _resolve(_paths["figures_dir"])
+AUDIT_DIR: Path = _resolve(_paths["audit_dir"])
+IMPORTANCE_VECTORS_DIR: Path = _resolve(_paths["importance_vectors_dir"])
+NOTEBOOKS_DIR: Path = (PROJECT_ROOT / "notebooks").resolve()
+
+# -----------------------------------------------------------------------------
+# Dataset schema (dataset-agnostic column names + PROCESS-2 specifics)
+# -----------------------------------------------------------------------------
+_dataset = CONFIG["dataset"]
+DATASET_NAME: str = _dataset["name"]
+_cols = _dataset["columns"]
+COL_PARTICIPANT_ID: str = _cols["participant_id"]
+COL_TRANSCRIPT_PATH: str = _cols["transcript_path"]
+COL_LABEL: str = _cols["label"]
+COL_SPLIT: str = _cols["split"]
+DIAGNOSIS_COLUMN: str = _dataset.get("diagnosis_column", "diagnosis")
+LABEL_MAPPING: dict[str, int] = dict(_dataset["label_mapping"])
+POSITIVE_CLASS_NAME: str = _dataset.get("positive_class_name", "CI")
+NEGATIVE_CLASS_NAME: str = _dataset.get("negative_class_name", "HC")
+TRAIN_SPLIT_VALUE: str = str(_dataset["train_split_value"]).lower()
+TEST_SPLIT_VALUE: str = str(_dataset["test_split_value"]).lower()
+EXPECTED_TRAIN_POOL: dict[str, int] = dict(_dataset.get("expected_train_pool", {}))
+EXPECTED_TEST: dict[str, int] = dict(_dataset.get("expected_test", {}))
+
+# -----------------------------------------------------------------------------
+# Features (the 13 modelling features, in SHAP-alignment order)
+# -----------------------------------------------------------------------------
+FEATURES: list[str] = list(CONFIG["features"])
+FEATURE_COLUMNS: tuple[str, ...] = tuple(FEATURES)  # back-compat alias
+
+# -----------------------------------------------------------------------------
+# Models and fixed hyperparameters (no tuning)
+# -----------------------------------------------------------------------------
+MODELS: dict[str, dict[str, Any]] = dict(CONFIG["models"])
+
+# -----------------------------------------------------------------------------
+# Learning-curve experiment settings
+# -----------------------------------------------------------------------------
+_experiment = CONFIG["experiment"]
+TRAINING_SIZE_GRID: list[int] = list(_experiment["training_size_grid"])
+ITERATIONS_PER_SIZE: int = int(_experiment["iterations_per_size"])
+_smoke = _experiment.get("smoke", {})
+SMOKE_TRAINING_SIZE_GRID: list[int] = list(
+    _smoke.get("training_size_grid", [80, 160, 240])
+)
+SMOKE_ITERATIONS: int = int(_smoke.get("iterations_per_size", 5))
+SMOKE_MODELS: list[str] = list(_smoke.get("models", ["logistic_regression"]))
+
+# -----------------------------------------------------------------------------
+# Metrics
+# -----------------------------------------------------------------------------
+_metrics = CONFIG["metrics"]
+PRIMARY_METRIC: str = _metrics.get("primary", "pearson")
+JACCARD_KS: list[int] = list(_metrics["jaccard_ks"])
+PERCENTILE_INTERVAL: tuple[float, float] = tuple(_metrics["percentile_interval"])  # type: ignore[assignment]
+
+# -----------------------------------------------------------------------------
+# SHAP / explainer settings
+# -----------------------------------------------------------------------------
+_shap = CONFIG["shap"]
+SHAP_BACKGROUND_SIZE: int = int(_shap["background_size"])
+KERNEL_SHAP_NSAMPLES: int = int(_shap["kernel_nsamples"])
+
+# -----------------------------------------------------------------------------
+# Reproducibility / seeding scheme
+# -----------------------------------------------------------------------------
+_repro = CONFIG["reproducibility"]
+GLOBAL_SEED: int = int(_repro["global_seed"])
+SIZE_INDEX_OFFSET: int = int(_repro.get("size_index_offset", 1000))
+RANDOM_SEED: int = GLOBAL_SEED  # back-compat alias
+
+
+def iteration_seed(size_index: int, run_id: int) -> int:
+    """Deterministic per-cell seed: global_seed + size_index*offset + run_id.
+
+    Guarantees every (training_size, run_id) draws a distinct, reproducible
+    subset. ``size_index`` is the position of the size in TRAINING_SIZE_GRID.
+    """
+    return GLOBAL_SEED + size_index * SIZE_INDEX_OFFSET + run_id
+
+
+# -----------------------------------------------------------------------------
+# NLP
+# -----------------------------------------------------------------------------
+SPACY_MODEL: str = CONFIG.get("nlp", {}).get("spacy_model", "en_core_web_sm")
 
 
 def is_process2() -> bool:
-    return DATASET_NAME == "PROCESS2"
+    """True when the active dataset is PROCESS-2 (kept for back-compat)."""
+    return DATASET_NAME.upper().startswith("PROCESS")
 
 
-DATA_DIR: Path = resolve_data_dir()
-OUTPUT_DIR: Path = (PROJECT_ROOT / "outputs").resolve()
-FIGURES_DIR: Path = (OUTPUT_DIR / "figures").resolve()
-NOTEBOOKS_DIR: Path = (PROJECT_ROOT / "notebooks").resolve()
-
-# PROCESS-2 metadata filename (under DATA_DIR)
+# -----------------------------------------------------------------------------
+# Compatibility aliases used by the data-loading / preprocessing validators.
+# -----------------------------------------------------------------------------
+PROCESS2_MASTER_CSV: Path = MASTER_CSV
 PROCESS2_METADATA_FILE: str = "metadata.csv"
-PROCESS2_EXPECTED_HC: int = int(os.environ.get("THESIS_EXPECTED_HC", "200"))
-PROCESS2_EXPECTED_CI: int = int(os.environ.get("THESIS_EXPECTED_CI", "200"))
-
-# Reproducibility
-RANDOM_SEED: int = int(os.environ.get("THESIS_RANDOM_SEED", "42"))
-
-# NLP models
-SPACY_MODEL: str = os.environ.get("THESIS_SPACY_MODEL", "en_core_web_sm")
-SBERT_MODEL_NAME: str = os.environ.get(
-    "THESIS_SBERT_MODEL", "sentence-transformers/all-MiniLM-L6-v2"
-)
-
-# Label handling for the *legacy augmented* fallback only
-LABEL_MODE: str = os.environ.get("THESIS_LABEL_MODE", "binary_hc_dementia")
-
-# Cross-validation (training set only for PROCESS-2)
-CV_SPLITS: int = 5
-
-# SHAP / KernelExplainer
-SHAP_BACKGROUND_SIZE: int = int(os.environ.get("THESIS_SHAP_BG", "24"))
-KERNEL_SHAP_NSAMPLES: int = int(os.environ.get("THESIS_KERNEL_NSAMPLES", "80"))
-
-# Bootstrap runs for stability (training set only)
-STABILITY_BOOTSTRAPS: int = int(os.environ.get("THESIS_BOOTSTRAPS", "15"))
-
-# Feature columns (order matters for SHAP alignment)
-FEATURE_COLUMNS: tuple[str, ...] = (
-    "type_token_ratio",
-    "filler_count",
-    "filler_ratio",
-    "mean_clause_length",
-    "semantic_coherence",
-    "content_density",
-    "noun_ratio",
-    "verb_ratio",
-    "adjective_ratio",
-    "adverb_ratio",
-    "pronoun_ratio",
-    "determiner_ratio",
-)
-
-OUTPUT_FEATURES: Path = OUTPUT_DIR / "features.csv"
-OUTPUT_BASELINE: Path = OUTPUT_DIR / "baseline_results.csv"
-OUTPUT_OPTIMIZED: Path = OUTPUT_DIR / "optimized_results.csv"
-OUTPUT_SHUFFLED: Path = OUTPUT_DIR / "shuffled_label_results.csv"
-OUTPUT_SHAP_BASELINE: Path = OUTPUT_DIR / "shap_values_baseline.csv"
-OUTPUT_SHAP_OPTIMIZED: Path = OUTPUT_DIR / "shap_values_optimized.csv"
-OUTPUT_STABILITY: Path = OUTPUT_DIR / "stability_results.csv"
+PROCESS2_EXPECTED_HC: int = int(EXPECTED_TRAIN_POOL.get("HC", 0) + EXPECTED_TEST.get("HC", 0)) or 200
+PROCESS2_EXPECTED_CI: int = int(EXPECTED_TRAIN_POOL.get("CI", 0) + EXPECTED_TEST.get("CI", 0)) or 200
+# Legacy label mode for the optional augmented-cohort fallback in data_loading.
+LABEL_MODE: str = "binary_hc_pathological"

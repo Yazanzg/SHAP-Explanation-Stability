@@ -1,18 +1,28 @@
-"""Linguistic feature extraction: TTR, fillers, clausal length, SBERT coherence, POS ratios."""
+"""Linguistic feature extraction: TTR, fillers, clausal length, POS ratios.
+
+The resubmission models the 13 features listed in ``config.yaml``. The
+``build_feature_matrix`` function at the bottom is dataset-agnostic: give it any
+table with raw transcript text and it returns exactly the configured feature
+columns. ``semantic_coherence`` is intentionally not computed (it was constant
+0.0 in the thesis environment and is excluded from the feature set), so no SBERT
+dependency is exercised on the active path.
+"""
 
 from __future__ import annotations
 
 import logging
+import re
 from functools import lru_cache
-from typing import Iterable
 
 import numpy as np
 import pandas as pd
-from scipy.spatial.distance import cosine
 
-from src.config import FEATURE_COLUMNS, SBERT_MODEL_NAME, SPACY_MODEL
+from src.config import FEATURE_COLUMNS, SPACY_MODEL
+from src.preprocessing import clean_transcript
 
 logger = logging.getLogger(__name__)
+
+_SENTENCE_SPLIT = re.compile(r"[.!?]+")
 
 
 @lru_cache(maxsize=1)
@@ -26,21 +36,6 @@ def _nlp():
             f"spaCy model '{SPACY_MODEL}' not installed. Run:\n"
             f"  python -m spacy download {SPACY_MODEL}\n"
         ) from e
-
-
-@lru_cache(maxsize=1)
-def _sbert():
-    """
-    Load SBERT model for semantic coherence.
-
-    On some Windows environments, importing `sentence_transformers` can transitively
-    import audio backends (e.g. torchcodec) that require FFmpeg DLLs. Since this
-    thesis pipeline is transcript-first, we fall back gracefully when SBERT cannot
-    be loaded, and treat semantic coherence as 0.0 in that case.
-    """
-    from sentence_transformers import SentenceTransformer
-
-    return SentenceTransformer(SBERT_MODEL_NAME)
 
 
 def type_token_ratio(tokens: list[str]) -> float:
@@ -77,36 +72,6 @@ def mean_clause_length_spacy(text: str) -> float:
         n_clause = max(1, len(finite))
         lengths.append(len(toks) / n_clause)
     return float(np.mean(lengths)) if lengths else 0.0
-
-
-def semantic_coherence_sbert(text: str) -> float:
-    """Mean cosine similarity between consecutive sentence embeddings."""
-    if not text.strip():
-        return 0.0
-    nlp = _nlp()
-    doc = nlp(text)
-    sents = [s.text.strip() for s in doc.sents if len(s.text.strip()) > 3]
-    if len(sents) < 2:
-        return float("nan")  # undefined; caller may coerce to 0.0
-    try:
-        model = _sbert()
-    except Exception as exc:
-        logger.warning(
-            "SBERT coherence unavailable (%s: %s). Setting semantic_coherence=0.0. "
-            "Fix by installing a compatible sentence-transformers / torch stack, "
-            "or by ensuring FFmpeg DLLs are available on Windows.",
-            type(exc).__name__,
-            exc,
-        )
-        return 0.0
-    emb = model.encode(sents, convert_to_numpy=True, show_progress_bar=False)
-    sims = []
-    for i in range(len(emb) - 1):
-        a, b = emb[i], emb[i + 1]
-        if np.linalg.norm(a) < 1e-12 or np.linalg.norm(b) < 1e-12:
-            continue
-        sims.append(1.0 - cosine(a, b))
-    return float(np.mean(sims)) if sims else float("nan")
 
 
 def content_density_ratio(text: str) -> float:
@@ -159,39 +124,67 @@ def pos_ratios(text: str) -> dict[str, float]:
     }
 
 
-def extract_row_features(cleaned_transcript: str) -> dict[str, float]:
-    tokens = [w for w in cleaned_transcript.split() if w]
-    ttr = type_token_ratio(tokens)
+# -----------------------------------------------------------------------------
+# Dataset-agnostic feature matrix (resubmission pipeline)
+# -----------------------------------------------------------------------------
+def _word_count(cleaned: str) -> int:
+    return len([w for w in cleaned.split() if w])
+
+
+def _sentence_count(raw: str) -> int:
+    t = str(raw).strip()
+    if not t:
+        return 0
+    return len([p for p in _SENTENCE_SPLIT.split(t) if p.strip()])
+
+
+def compute_all_features(raw_text: str) -> dict[str, float]:
+    """Compute every supported linguistic feature from a single raw transcript.
+
+    Returns a superset dict; callers select the configured FEATURE_COLUMNS.
+    ``semantic_coherence`` is deliberately excluded (constant 0.0, dropped).
+    """
+    cleaned = clean_transcript(str(raw_text))
+    tokens = [w for w in cleaned.split() if w]
     fc, fr = filler_features(tokens)
-    mcl = mean_clause_length_spacy(cleaned_transcript)
-    coh = semantic_coherence_sbert(cleaned_transcript)
-    if coh != coh:  # NaN
-        coh = 0.0
-    pr = pos_ratios(cleaned_transcript)
-    cd = content_density_ratio(cleaned_transcript)
+    pos = pos_ratios(cleaned)
     return {
-        "type_token_ratio": ttr,
+        "word_count": float(_word_count(cleaned)),
+        "sentence_count": float(_sentence_count(raw_text)),
+        "type_token_ratio": type_token_ratio(tokens),
         "filler_count": float(fc),
         "filler_ratio": fr,
-        "mean_clause_length": mcl,
-        "semantic_coherence": coh,
-        "content_density": cd,
-        **pr,
+        "mean_clause_length": mean_clause_length_spacy(cleaned),
+        "content_density": content_density_ratio(cleaned),
+        **pos,
     }
 
 
-def extract_features_table(corpus: pd.DataFrame) -> pd.DataFrame:
-    """Corpus must include participant_id, cleaned_transcript, word_count."""
-    feats = []
-    for _, row in corpus.iterrows():
-        d = extract_row_features(str(row["cleaned_transcript"]))
-        feats.append({"participant_id": row["participant_id"], **d})
-    feat_df = pd.DataFrame(feats)
-    out = corpus[["participant_id", "cleaned_transcript", "word_count"]].merge(
-        feat_df, on="participant_id", how="left"
-    )
-    # Ensure column order
-    for c in FEATURE_COLUMNS:
-        if c not in out.columns:
-            out[c] = np.nan
-    return out
+def build_feature_matrix(
+    table: pd.DataFrame,
+    *,
+    text_column: str,
+    id_column: str,
+    label_column: str,
+    split_column: str,
+    feature_names: tuple[str, ...] = FEATURE_COLUMNS,
+) -> pd.DataFrame:
+    """Build the modelling feature matrix from any table of raw transcripts.
+
+    ``table`` must contain the id/label/split columns plus a raw transcript text
+    column. Returns a DataFrame with id/label/split + one column per configured
+    feature, in feature order. No imputation is performed; missing features (if a
+    transcript cannot be parsed) surface as NaN for the audit to catch.
+    """
+    rows: list[dict[str, float]] = []
+    for _, r in table.iterrows():
+        feats = compute_all_features(r[text_column])
+        row: dict[str, float] = {
+            id_column: r[id_column],
+            label_column: r[label_column],
+            split_column: str(r[split_column]).strip().lower(),
+        }
+        for name in feature_names:
+            row[name] = float(feats.get(name, np.nan))
+        rows.append(row)
+    return pd.DataFrame(rows)

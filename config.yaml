@@ -1,0 +1,180 @@
+# =============================================================================
+# config.yaml — single source of truth for the thesis pipeline
+# =============================================================================
+# Research question (resubmission):
+#   Are SHAP feature attributions in transcript-based cognitive-impairment
+#   classifiers robust to which participants enter the training set, and how
+#   does this robustness change as training size grows?
+#
+# Everything that is dataset-, path-, or experiment-specific lives in THIS file.
+# Source code under src/ and scripts/ reads from here and contains no hard-coded
+# paths or parameters. To run on a different cohort, point `dataset.master_csv`
+# at any CSV exposing the columns named under `dataset.columns` and adjust the
+# label mapping; no code changes are required.
+# -----------------------------------------------------------------------------
+
+# -----------------------------------------------------------------------------
+# Paths (all relative to the repository root unless absolute).
+# -----------------------------------------------------------------------------
+paths:
+  data_dir: "PROCESS-2"                                  # raw cohort root (not committed)
+  master_csv: "outputs/process2_ctd_binary_master.csv"  # authoritative index of transcripts + labels + split
+  features_csv: "outputs/process2_features.csv"          # extracted 13-feature matrix
+  outputs_dir: "outputs"
+  figures_dir: "outputs/figures"
+  audit_dir: "outputs/audit"
+  importance_vectors_dir: "outputs/importance_vectors"
+
+# -----------------------------------------------------------------------------
+# Dataset schema. The pipeline is dataset-agnostic: it only requires a CSV with
+# the four logical columns below. PROCESS-2-specific facts (diagnosis classes,
+# the merge into a binary HC/CI label, expected counts) live here, not in code.
+# -----------------------------------------------------------------------------
+dataset:
+  name: "PROCESS-2"
+  task: "transcript-based cognitive-impairment classification (HC vs CI)"
+  # Logical column names expected by the pipeline. Rename here to use another CSV.
+  columns:
+    participant_id: "participant_id"
+    transcript_path: "transcript_path"
+    label: "binary_label"     # 0 = HC, 1 = CI
+    split: "split"            # "train" or "dev"
+  # Optional 3-class diagnosis column used only for reporting/cross-tabulation.
+  diagnosis_column: "diagnosis"
+  # How the original diagnosis maps to the binary modelling label.
+  # CI (positive class) = MCI + dementia merged.
+  label_mapping:
+    HC: 0
+    MCI: 1
+    Dementia: 1
+  positive_class_name: "CI"
+  negative_class_name: "HC"
+  # Split values as they appear in the CSV; "test"/"dev" are treated as the held-out set.
+  train_split_value: "train"
+  test_split_value: "dev"
+  # Expected composition (used for verification only; mismatches warn, never silently fix).
+  expected_train_pool: {HC: 160, CI: 160}
+  expected_test: {HC: 40, CI: 40}
+
+# -----------------------------------------------------------------------------
+# The 13 transcript-derived linguistic features used for modelling and SHAP.
+# Order matters: SHAP vectors are aligned to this order.
+#
+# NOTE (documented decision, 2026-06-15): `semantic_coherence` is EXCLUDED.
+# SBERT was unavailable in the thesis environment, so it was constant 0.0 for
+# all 400 participants (a dead input contributing zero SHAP in every run, which
+# would corrupt the Pearson attribution-stability metric). This matches the
+# README's stated final 13-feature set. The stale 12-feature list in the old
+# src/config.py (which kept semantic_coherence and omitted word/sentence count)
+# is superseded by this list.
+# -----------------------------------------------------------------------------
+features:
+  - word_count
+  - sentence_count
+  - type_token_ratio
+  - filler_count
+  - filler_ratio
+  - mean_clause_length
+  - content_density
+  - noun_ratio
+  - verb_ratio
+  - adjective_ratio
+  - adverb_ratio
+  - pronoun_ratio
+  - determiner_ratio
+
+# -----------------------------------------------------------------------------
+# Model families with FIXED, PRE-SPECIFIED hyperparameters. No setting is
+# selected through GridSearchCV, optimisation, or performance-based tuning; all
+# values are fixed before the resampling experiment. Most settings are the
+# scikit-learn library defaults:
+#   - logistic_regression: scikit-learn defaults (lbfgs, max_iter=100, C=1.0).
+#     A convergence test confirmed the solver converges in 15-17 iterations on
+#     both the smallest (80) and largest (320) balanced subsets, so the default
+#     max_iter=100 is sufficient and no convergence safeguard is needed.
+#   - svm_rbf: scikit-learn defaults (rbf, C=1.0, gamma="scale"); probability=true
+#     is required so KernelSHAP can read predict_proba, not a tuned choice.
+#   - random_forest: n_estimators=300 is the ONE non-default value, fixed a priori
+#     for more stable TreeSHAP estimates (more trees -> lower Monte-Carlo noise);
+#     it was not selected on predictive performance.
+# `shap_explainer` records which SHAP family explains each model.
+# -----------------------------------------------------------------------------
+models:
+  logistic_regression:
+    estimator: "LogisticRegression"
+    shap_explainer: "LinearSHAP"
+    scale_features: true            # StandardScaler before the classifier
+    hyperparameters:
+      max_iter: 100                 # scikit-learn default; convergence verified
+      solver: "lbfgs"
+      C: 1.0
+  random_forest:
+    estimator: "RandomForestClassifier"
+    shap_explainer: "TreeSHAP"
+    scale_features: false           # trees are scale-invariant
+    hyperparameters:
+      n_estimators: 300             # fixed pre-specified (non-default) for SHAP stability
+      n_jobs: -1
+  svm_rbf:
+    estimator: "SVC"
+    shap_explainer: "KernelSHAP"
+    scale_features: true
+    hyperparameters:
+      kernel: "rbf"
+      probability: true
+      C: 1.0
+      gamma: "scale"
+
+# -----------------------------------------------------------------------------
+# Training-size learning-curve experiment.
+# Pool is exactly 160 HC / 160 CI, so the balanced grid runs to 320.
+# Each subset is balanced and stratified: HC and CI are sampled independently
+# WITHOUT replacement, n_hc = n_ci = training_size / 2.
+# -----------------------------------------------------------------------------
+experiment:
+  training_size_grid: [80, 120, 160, 200, 240, 280, 320]   # 7 sizes
+  iterations_per_size: 20                                   # B subsets per (model, size) cell
+  # Reduced settings used only by the smoke test / quick checks.
+  smoke:
+    training_size_grid: [80, 160, 240]
+    iterations_per_size: 5
+    models: ["logistic_regression"]
+
+# -----------------------------------------------------------------------------
+# Stability metrics computed over all C(B, 2) pairwise comparisons per cell.
+# Pearson on raw mean-|SHAP| vectors is the PRIMARY metric (supervisor's
+# recommendation over Spearman, which magnifies rank swaps among near-zero
+# values on only 13 features). Spearman is appendix sensitivity only.
+# -----------------------------------------------------------------------------
+metrics:
+  primary: "pearson"
+  jaccard_ks: [3, 5, 10]
+  percentile_interval: [2.5, 97.5]   # reported alongside every mean (95% band)
+
+# -----------------------------------------------------------------------------
+# SHAP / explainer settings.
+# -----------------------------------------------------------------------------
+shap:
+  background_size: 24       # KernelSHAP background = 24 train rows
+  kernel_nsamples: 80       # KernelSHAP nsamples
+
+# -----------------------------------------------------------------------------
+# Reproducibility / seeding scheme.
+#   global_seed                              -> base seed for all randomness
+#   per-iteration seed = global_seed
+#                        + size_index * 1000
+#                        + run_id              (run_id in 0..iterations-1)
+# This guarantees every (training_size, run_id) cell draws a distinct, fully
+# documented subset, while remaining deterministic across re-runs. The size_index
+# offset (1000) is larger than any plausible iteration count, so streams from
+# different sizes never collide.
+# -----------------------------------------------------------------------------
+reproducibility:
+  global_seed: 42
+  size_index_offset: 1000
+
+# -----------------------------------------------------------------------------
+# spaCy model used for POS-based feature extraction.
+# -----------------------------------------------------------------------------
+nlp:
+  spacy_model: "en_core_web_sm"

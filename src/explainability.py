@@ -161,16 +161,3 @@ def compute_shap_values(
                 }
             )
     return pd.DataFrame(rows)
-
-
-def compute_shap_suite(
-    fitted_models: dict[str, Pipeline],
-    X: pd.DataFrame,
-    *,
-    variant: str,
-) -> pd.DataFrame:
-    parts = []
-    for name, pipe in fitted_models.items():
-        logger.info("SHAP (%s): %s", variant, name)
-        parts.append(compute_shap_values(name, pipe, X, variant=variant))
-    return pd.concat(parts, ignore_index=True)

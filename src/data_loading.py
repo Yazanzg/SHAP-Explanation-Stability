@@ -10,18 +10,82 @@ from typing import Any
 import pandas as pd
 
 from src.config import (
+    COL_LABEL,
+    COL_PARTICIPANT_ID,
+    COL_SPLIT,
+    COL_TRANSCRIPT_PATH,
     DATA_DIR,
     DATASET_NAME,
+    DIAGNOSIS_COLUMN,
     LABEL_MODE,
+    MASTER_CSV,
     PROCESS2_MASTER_CSV,
     PROCESS2_EXPECTED_CI,
     PROCESS2_EXPECTED_HC,
     PROCESS2_METADATA_FILE,
     PROJECT_ROOT,
+    TEST_SPLIT_VALUE,
+    TRAIN_SPLIT_VALUE,
     is_process2,
 )
 
 logger = logging.getLogger(__name__)
+
+
+def load_dataset_table(
+    master_csv: Path | None = None,
+    *,
+    load_text: bool = True,
+) -> pd.DataFrame:
+    """Load any cohort CSV using the column names declared in ``config.yaml``.
+
+    Dataset-agnostic: the CSV must expose the logical columns configured under
+    ``dataset.columns`` (participant_id, transcript_path, label, split). The
+    diagnosis column is optional and used only for reporting. Returns a table
+    with normalised logical column names plus a raw ``transcript`` text column
+    when ``load_text`` is True. No imputation or row dropping happens here.
+    """
+    p = Path(master_csv) if master_csv is not None else MASTER_CSV
+    if not p.is_file():
+        raise FileNotFoundError(f"Dataset master CSV not found: {p}")
+    df = pd.read_csv(p)
+
+    required = {COL_PARTICIPANT_ID, COL_TRANSCRIPT_PATH, COL_LABEL, COL_SPLIT}
+    missing = required - set(df.columns)
+    if missing:
+        raise ValueError(
+            f"{p} missing required columns {sorted(missing)}. "
+            f"Present: {list(df.columns)}"
+        )
+
+    out = pd.DataFrame()
+    out[COL_PARTICIPANT_ID] = df[COL_PARTICIPANT_ID].astype(str).str.strip()
+    out[COL_TRANSCRIPT_PATH] = df[COL_TRANSCRIPT_PATH].astype(str)
+    out[COL_LABEL] = df[COL_LABEL].astype(int)
+    split_norm = df[COL_SPLIT].astype(str).str.strip().str.lower()
+    # Treat the configured test value and "test" as the held-out split.
+    split_norm = split_norm.replace({"test": TEST_SPLIT_VALUE})
+    out[COL_SPLIT] = split_norm
+    if DIAGNOSIS_COLUMN in df.columns:
+        out[DIAGNOSIS_COLUMN] = df[DIAGNOSIS_COLUMN].astype(str).str.strip()
+
+    dup = out[COL_PARTICIPANT_ID].duplicated().sum()
+    if dup:
+        raise ValueError(f"Duplicate participant ids in {p}: {dup}")
+
+    if load_text:
+        texts: list[str] = []
+        for path_str in out[COL_TRANSCRIPT_PATH].tolist():
+            pth = Path(path_str)
+            if not pth.is_absolute():
+                pth = (PROJECT_ROOT / pth).resolve()
+            try:
+                texts.append(pth.read_text(encoding="utf-8", errors="replace"))
+            except OSError:
+                texts.append("")
+        out["transcript"] = pd.Series(texts, index=out.index).astype(str)
+
+    return out.reset_index(drop=True)
 
 _PROCESS2_ID_PATTERN = re.compile(r"PROCESS-2_rec__\d+", re.I)
 
