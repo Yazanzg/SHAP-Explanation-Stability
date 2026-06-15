@@ -73,18 +73,23 @@ def _pairwise_pearson(vectors: list[np.ndarray]) -> list[float]:
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--smoke", action="store_true", help="use experiment.smoke settings")
+    ap.add_argument("--models", nargs="+", default=None,
+                    help="restrict to these model keys (e.g. logistic_regression random_forest)")
     args = ap.parse_args()
 
     if args.smoke:
         tag = "smoke"
         sizes = config.SMOKE_TRAINING_SIZE_GRID
         iters = config.SMOKE_ITERATIONS
-        models = config.SMOKE_MODELS
+        models = args.models or config.SMOKE_MODELS
     else:
         tag = "full"
         sizes = config.TRAINING_SIZE_GRID
         iters = config.ITERATIONS_PER_SIZE
-        models = list(config.MODELS)
+        models = args.models or list(config.MODELS)
+    for m in models:
+        if m not in config.MODELS:
+            raise SystemExit(f"Unknown model '{m}'. Configured: {list(config.MODELS)}")
 
     df = pd.read_csv(config.FEATURES_CSV)
     df[COL_SPLIT] = df[COL_SPLIT].astype(str).str.strip().str.lower()
@@ -123,13 +128,20 @@ def main() -> None:
 
     config.OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     config.IMPORTANCE_VECTORS_DIR.mkdir(parents=True, exist_ok=True)
-    perf_path = config.OUTPUT_DIR / f"{tag}_performance.csv"
-    imp_path = config.IMPORTANCE_VECTORS_DIR / f"{tag}_importance_vectors.csv"
+    if tag == "full":
+        perf_path = config.OUTPUT_DIR / "training_size_runs.csv"
+        imp_path = config.IMPORTANCE_VECTORS_DIR / "training_size_importance_vectors.csv"
+    else:
+        perf_path = config.OUTPUT_DIR / f"{tag}_performance.csv"
+        imp_path = config.IMPORTANCE_VECTORS_DIR / f"{tag}_importance_vectors.csv"
     perf_df.to_csv(perf_path, index=False)
     imp_df.to_csv(imp_path, index=False)
 
     lo, hi = config.PERCENTILE_INTERVAL
+    n_vectors = imp_df[["model", "training_size", "run_id"]].drop_duplicates().shape[0]
     print(f"\n[run:{tag}] completed {len(perf_df)} fits in {time.time()-t0:.1f}s")
+    print(f"[run:{tag}] runs rows={len(perf_df)}  importance vectors={n_vectors}  "
+          f"importance rows={len(imp_df)}")
     print(f"[run:{tag}] wrote {perf_path}")
     print(f"[run:{tag}] wrote {imp_path}\n")
 

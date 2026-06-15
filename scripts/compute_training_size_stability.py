@@ -73,8 +73,12 @@ def main() -> None:
                     help="which learning-curve outputs to summarise")
     args = ap.parse_args()
 
-    imp_path = config.IMPORTANCE_VECTORS_DIR / f"{args.tag}_importance_vectors.csv"
-    perf_path = config.OUTPUT_DIR / f"{args.tag}_performance.csv"
+    if args.tag == "full":
+        imp_path = config.IMPORTANCE_VECTORS_DIR / "training_size_importance_vectors.csv"
+        perf_path = config.OUTPUT_DIR / "training_size_runs.csv"
+    else:
+        imp_path = config.IMPORTANCE_VECTORS_DIR / f"{args.tag}_importance_vectors.csv"
+        perf_path = config.OUTPUT_DIR / f"{args.tag}_performance.csv"
     imp = pd.read_csv(imp_path)
     perf = pd.read_csv(perf_path)
 
