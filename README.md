@@ -1,28 +1,57 @@
-# Stability in Optimized NLP Models
+# Attribution Stability vs Training-Set Size
 
-**Thesis:** Evaluating Explanation Stability in Optimized NLP Models for Cognitive Impairment Classification from Spontaneous Speech
+**Thesis:** Are SHAP feature attributions in transcript-based cognitive-impairment
+classifiers robust to which participants enter the training set, and how does this
+robustness change as training size grows?
 
-This repository contains the **Bachelor thesis code component** for PROCESS-2 Cookie Theft Description (CTD) transcripts. It provides reproducible scripts, validation reports, and reported results. The controlled PROCESS-2 dataset is **not** redistributed here.
+This repository contains the **Bachelor thesis code component** for PROCESS-2
+Cookie Theft Description (CTD) transcripts. It extracts linguistic features from
+transcripts, trains three model families with **fixed, pre-specified settings (no
+tuning)**, computes SHAP attributions on a **fixed development split**, and
+measures how the **stability of those attributions across different training
+subsets** changes as the training-set size grows. The controlled PROCESS-2
+dataset is **not** redistributed here.
+
+> Terminology: "attribution stability" = similarity of SHAP attributions across
+> models trained on different participant subsets of the same size;
+> "training-size effect" = how that stability changes with subset size;
+> "performance" = test-set AUROC / F1 / accuracy / precision / recall. The
+> modelling object is **transcript-derived features**.
 
 ## What this code does
 
-1. Loads a local master table (`outputs/process2_ctd_binary_master.csv`) with CTD transcript paths and labels
-2. Preprocesses transcript text and extracts **13 linguistic features** (spaCy; semantic coherence excluded in final thesis runs)
-3. Trains **Logistic Regression**, **Random Forest**, and **RBF SVM** on the predefined **training split** (320 participants)
-4. Tunes hyperparameters with **GridSearchCV** on training data only (`roc_auc`, 5-fold stratified CV)
-5. Evaluates on the predefined **development split** (80 participants)
-6. Computes **SHAP** explanations on the **fixed development split**
-7. Measures **explanation stability** (direct baseline vs optimized SHAP; bootstrap resampling of training data)
+1. Loads a cohort master table (`outputs/process2_ctd_binary_master.csv`) with
+   CTD transcript paths, the binary label (0 = HC, 1 = CI = MCI + dementia
+   merged), and the predefined train/dev split.
+2. Cleans transcript text and extracts **13 linguistic features** (spaCy).
+3. Trains **Logistic Regression**, **Random Forest**, and **RBF SVM** on balanced,
+   stratified subsets drawn from the 320-participant training pool, with fixed
+   hyperparameters (no GridSearchCV, no performance-based selection).
+4. Evaluates on the **fixed 80-participant development split** (AUROC, F1,
+   accuracy, precision, recall).
+5. Computes **SHAP** attributions on that same fixed split (LinearSHAP for LR,
+   TreeSHAP for RF, KernelSHAP for SVM) and reduces each run to a mean-|SHAP|
+   vector of length 13.
+6. Measures **attribution stability** across many subsets of the same size
+   (pairwise Pearson on raw mean-|SHAP| vectors as the primary metric; Jaccard@k
+   and Spearman as secondary/appendix), with percentile intervals, as a function
+   of training-set size.
+
+## Configuration
+
+All paths and parameters live in **`config.yaml`** at the repository root — the
+single source of truth (paths, dataset schema, the 13 features, model settings,
+training-size grid, iteration count, seeding scheme, Jaccard `k` values, SHAP
+settings). The code is dataset-agnostic: point `dataset.master_csv` at any CSV
+exposing the configured `participant_id` / `transcript_path` / `label` / `split`
+columns. Set the `THESIS_CONFIG` environment variable to use an alternate config.
 
 ## Dataset (not included in this repository)
 
 - **Source:** PROCESS-2 (controlled access via Hugging Face / CognoSpeak)
-- **Task:** Cookie Theft Description (`*__CTD.txt`) only
-- **Labels:** `binary_label` — 0 = HC, 1 = CI (MCI + Dementia merged)
-- **Split:** predefined **train** (320) / **dev** (80); no new random split is created locally
-- **Place data locally** under `PROCESS-2/` (see `examples/` for expected file layout)
-
-After downloading PROCESS-2, build or update the master table paths, then run the staged scripts below.
+- **Task:** Cookie Theft Description (`*__CTD.txt`) only; HC vs CI (MCI + dementia)
+- **Split:** predefined **train (320)** / **dev (80)**; never resampled
+- Place data locally under `PROCESS-2/` (see `examples/` for the expected layout)
 
 ## Installation
 
@@ -34,84 +63,58 @@ pip install -r requirements-freeze.txt
 python -m spacy download en_core_web_sm
 ```
 
-Pinned versions used for thesis experiments are listed in `requirements-freeze.txt` (Python 3.11+ recommended).
+## Smoke test (no real data required)
 
-## Reproduce thesis outputs (staged scripts)
+```powershell
+$env:THESIS_CONFIG = "examples/synthetic/config.yaml"
+python scripts/smoke_test.py
+```
 
-Run from the repository root in order. Each step writes CSV/report files under `outputs/`.
+Runs the full pipeline on a 10-participant synthetic cohort in under two minutes.
+
+## Reproduce (staged scripts)
+
+Run from the repository root in order; see `scripts/README.md` for the full list.
 
 ```powershell
 python scripts/validate_process2_loader.py
 python scripts/validate_process2_preprocessing.py
 python scripts/validate_process2_features.py
-python scripts/validate_process2_baselines.py
-python scripts/validate_process2_optimization.py
-python scripts/validate_process2_shap.py
-python scripts/validate_process2_stability.py
-python scripts/validate_process2_bootstrap_stability.py
-python scripts/plot_process2_stability_comparison.py
+python scripts/audit_features.py
+# training-size learning-curve runs, stability metrics, and plots: TASK 4-8
 ```
 
-**Notes:**
+## Modelling features (n = 13)
 
-- `validate_process2_features.py` requires `outputs/process2_ctd_binary_master.csv` with valid local `transcript_path` entries.
-- **Semantic coherence** is computed in code but was **constant (0.0)** in the thesis environment and **excluded** from all modeling and SHAP (13 features only).
-- **Bootstrap iterations:** 50 for Logistic Regression and Random Forest; **25 for SVM RBF** (runtime; documented in validation report).
-- `run_pipeline.py` is a legacy/monolithic entry point; the **staged `scripts/validate_process2_*.py` files** match the reported thesis experiments.
+`word_count`, `sentence_count`, `type_token_ratio`, `filler_count`,
+`filler_ratio`, `mean_clause_length`, `content_density`, `noun_ratio`,
+`verb_ratio`, `adjective_ratio`, `adverb_ratio`, `pronoun_ratio`,
+`determiner_ratio`.
 
-## Environment variables
+(`semantic_coherence` was constant 0.0 in the thesis environment and is excluded;
+see `outputs/audit/feature_audit.md`.)
 
-| Variable | Default | Purpose |
-|----------|---------|---------|
-| `THESIS_DATASET` | `PROCESS2` | Dataset mode (`PROCESS2` for thesis) |
-| `THESIS_DATA_DIR` | `<repo>/PROCESS-2` | PROCESS-2 root folder |
-| `THESIS_PROCESS2_MASTER_CSV` | `outputs/process2_ctd_binary_master.csv` | Master index CSV |
-| `THESIS_RANDOM_SEED` | `42` | Random seed |
-| `THESIS_SHAP_BG` | `24` | KernelSHAP background size (from train) |
-| `THESIS_KERNEL_NSAMPLES` | `80` | KernelSHAP `nsamples` |
-| `THESIS_SPACY_MODEL` | `en_core_web_sm` | spaCy model |
+## Model settings (fixed, pre-specified — not tuned)
 
-## Key outputs (thesis-reported)
+- **Logistic Regression** — scikit-learn defaults (`lbfgs`, `max_iter=100`,
+  `C=1.0`); convergence verified (15-17 iterations on the smallest/largest
+  subsets). Explained with LinearSHAP.
+- **Random Forest** — `n_estimators=300` (one fixed non-default value, chosen a
+  priori for more stable TreeSHAP; not tuned). Explained with TreeSHAP.
+- **RBF SVM** — scikit-learn defaults (`C=1.0`, `gamma="scale"`); `probability=True`
+  for KernelSHAP. Explained with KernelSHAP (background = 24 train rows,
+  `nsamples=80`).
 
-| File | Description |
-|------|-------------|
-| `outputs/process2_features.csv` | 400 rows, 13 modeling features + metadata |
-| `outputs/baseline_results.csv` | Dev metrics: LR, RF, SVM baselines |
-| `outputs/optimized_results.csv` | Dev metrics after GridSearchCV |
-| `outputs/shap/process2_shap_values_{baseline\|optimized}_*.csv` | SHAP on **dev** (80 rows each) |
-| `outputs/direct_shap_stability.csv` | Direct baseline vs optimized stability |
-| `outputs/bootstrap_stability.csv` | Bootstrap stability summary |
-| `outputs/figures/process2_stability_direct_vs_bootstrap_adjusted.png` | Results figure |
-
-Validation `.txt` reports are written locally when you run staged scripts but are not stored in this repository.
-
-## Project layout
-
-```text
-README.md
-requirements.txt
-requirements-freeze.txt
-run_pipeline.py
-src/                    # pipeline modules
-scripts/                # staged PROCESS-2 validation + figure script
-examples/               # dummy schema + sample transcript (no real data)
-outputs/                # generated thesis artifacts (subset committed)
-.gitignore
-```
-
-## Modeling features (final thesis, n=13)
-
-`word_count`, `sentence_count`, `type_token_ratio`, `filler_count`, `filler_ratio`, `mean_clause_length`, `content_density`, `noun_ratio`, `verb_ratio`, `adjective_ratio`, `adverb_ratio`, `pronoun_ratio`, `determiner_ratio`
-
-## Explanation stability (thesis focus)
-
-1. **Direct SHAP stability** — Compare baseline vs optimized global feature importance (mean \|SHAP\|) on the **fixed development split**. Metrics: Spearman rank correlation, Jaccard@k, mean CV of \|SHAP\| across dev participants.
-2. **Bootstrap stability** — Resample **training** data (320 with replacement), refit models with **fixed** hyperparameters, recompute SHAP on the **same development split**. Aggregate pairwise Spearman and Jaccard@k across bootstrap runs.
+No hyperparameter is selected through GridSearchCV, optimisation, or
+performance-based tuning.
 
 ## Disclaimer
 
-Research and education only. **Not** a clinical diagnosis system. Do not redistribute PROCESS-2 audio or transcripts via this repository.
+Research and education only. **Not** a clinical diagnosis system. Do not
+redistribute PROCESS-2 audio or transcripts via this repository.
 
 ## Citation
 
-If you use PROCESS-2, cite the dataset publication and Hugging Face access terms. This code repository documents the thesis implementation only.
+If you use PROCESS-2, cite the dataset publication and Hugging Face access terms.
+A full citations section (scikit-learn, SHAP, SciPy, NumPy, pandas, matplotlib,
+spaCy) is finalised in the documentation pass (TASK 9).
